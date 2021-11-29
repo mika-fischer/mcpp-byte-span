@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <cstring>
 #include <iterator>
 #include <string_view>
 #include <type_traits>
