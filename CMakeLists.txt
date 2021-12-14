@@ -15,7 +15,7 @@ target_include_directories(mcpp-byte-span INTERFACE
     $<INSTALL_INTERFACE:include>)
 target_compile_features(mcpp-byte-span INTERFACE cxx_std_17)
 set_target_properties(mcpp-byte-span PROPERTIES EXPORT_NAME mcpp::byte-span)
-add_library(MCPP::byte-span ALIAS mcpp-byte-span)
+add_library(mcpp::byte-span ALIAS mcpp-byte-span)
 
 install(TARGETS mcpp-byte-span EXPORT ${PROJECT_NAME}-config)
 install(EXPORT ${PROJECT_NAME}-config DESTINATION share/cmake/${PROJECT_NAME})
