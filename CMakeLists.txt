@@ -7,20 +7,20 @@ else ()
     set(is_toplevel FALSE)
 endif ()
 
-option(mcpp-byte-span_WITH_TESTS "Build tests" ${is_toplevel})
+option(${PROJECT_NAME}_WITH_TESTS "Build tests" ${is_toplevel})
 
-add_library(mcpp-byte-span INTERFACE)
-target_include_directories(mcpp-byte-span INTERFACE
+add_library(${PROJECT_NAME} INTERFACE)
+target_include_directories(${PROJECT_NAME} INTERFACE
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>)
-target_compile_features(mcpp-byte-span INTERFACE cxx_std_17)
-set_target_properties(mcpp-byte-span PROPERTIES EXPORT_NAME mcpp::byte-span)
-add_library(mcpp::byte-span ALIAS mcpp-byte-span)
+target_compile_features(${PROJECT_NAME} INTERFACE cxx_std_17)
+set_target_properties(${PROJECT_NAME} PROPERTIES EXPORT_NAME mcpp::byte-span)
+add_library(mcpp::byte-span ALIAS ${PROJECT_NAME})
 
-install(TARGETS mcpp-byte-span EXPORT ${PROJECT_NAME}-config)
+install(TARGETS ${PROJECT_NAME} EXPORT ${PROJECT_NAME}-config)
 install(EXPORT ${PROJECT_NAME}-config DESTINATION share/cmake/${PROJECT_NAME})
 install(DIRECTORY include DESTINATION ".")
 
-if (mcpp-byte-span_WITH_TESTS)
+if (${PROJECT_NAME}_WITH_TESTS)
     add_subdirectory(tests)
 endif ()
