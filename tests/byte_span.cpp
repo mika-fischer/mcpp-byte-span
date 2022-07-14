@@ -7,6 +7,7 @@
 #include <iterator>
 #include <string_view>
 #include <utility>
+#include <vector>
 
 namespace mcpp::byte_span::detail {
 static_assert(is_byte_like_v<char>);

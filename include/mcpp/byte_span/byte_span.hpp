@@ -5,12 +5,12 @@
 #pragma once
 
 #include <algorithm>
+#include <array>
 #include <cstdint>
 #include <cstring>
 #include <iterator>
 #include <string_view>
 #include <type_traits>
-#include <vector>
 
 namespace mcpp::byte_span {
 
