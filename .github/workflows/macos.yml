@@ -1,0 +1,35 @@
+name: macOS
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  xcode:
+    runs-on: ${{ matrix.os }}
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_${{ matrix.xcode }}.app/Contents/Developer
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - macos-12
+        xcode:
+          # https://github.com/actions/virtual-environments/blob/main/images/macos/macos-12-Readme.md#xcode
+          - "13.3.1"
+          - "13.4.1"
+          - "14.0.1"
+          - "14.1"
+          - "14.2"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE:STRING=Debug
+      - name: Build
+        run: cmake --build build --config Debug
+      - name: Test
+        working-directory: build
+        run: ctest --build-config Debug --output-on-failure
