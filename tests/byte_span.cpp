@@ -93,13 +93,13 @@ static_assert(test_implicit<true, true, true, true, std::array<std::byte, 4> &>(
 static_assert(test_implicit<true, false, true, false, std::array<std::byte, 2> &>());
 static_assert(test_implicit<true, true, false, false, const std::array<std::byte, 4> &>());
 static_assert(test_implicit<true, false, false, false, const std::array<std::byte, 2> &>());
-static_assert(test_implicit<false, false, false, false, std::array<std::byte, 4> &&>());
-static_assert(test_implicit<false, false, false, false, std::array<std::byte, 2> &&>());
+static_assert(test<false, false, false, false, std::array<std::byte, 4> &&>());
+static_assert(test<false, false, false, false, std::array<std::byte, 2> &&>());
 
 // Container
 static_assert(test_implicit<true, false, true, false, std::vector<std::byte> &>());
 static_assert(test_implicit<true, false, false, false, const std::vector<std::byte> &>());
-static_assert(test_implicit<false, false, false, false, std::vector<std::byte> &&>());
+static_assert(test<false, false, false, false, std::vector<std::byte> &&>());
 
 // nullptr
 static_assert(test_implicit<true, false, true, false, std::nullptr_t>());
