@@ -3,6 +3,7 @@
 // (See accompanying file LICENSE.txt or copy at https://www.boost.org/LICENSE_1_0.txt)
 
 #include "mcpp/byte_span/byte_span.hpp"
+
 #include <functional>
 #include <iterator>
 #include <string_view>
