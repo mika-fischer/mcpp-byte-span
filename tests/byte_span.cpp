@@ -104,6 +104,11 @@ static_assert(test<false, false, false, false, std::vector<std::byte> &&>());
 // nullptr
 static_assert(test_implicit<true, false, true, false, std::nullptr_t>());
 
+// std::string_view
+static_assert(test_implicit<true, false, false, false, std::string_view &>());
+static_assert(test_implicit<true, false, false, false, const std::string_view &>());
+static_assert(test_implicit<true, false, false, false, std::string_view &&>());
+
 // is_byte_like
 static_assert(is_byte_like_v<char>);
 static_assert(is_byte_like_v<unsigned char>);
