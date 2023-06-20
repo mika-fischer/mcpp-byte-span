@@ -4,13 +4,15 @@
 
 #pragma once
 
-#include <algorithm>
-#include <array>
-#include <cstdint>
-#include <cstring>
-#include <iterator>
-#include <string_view>
-#include <type_traits>
+#include <algorithm>   // std::lexicographical_compare
+#include <array>       // std::array
+#include <cstddef>     // std::size_t
+#include <cstdint>     // SIZE_MAX
+#include <cstring>     // std::memcmp
+#include <iterator>    // std::data, std::size
+#include <string_view> // std::string_view
+#include <type_traits> // std::false_type, std::true_type, std::void_t, ...
+#include <utility>     // std::declval
 
 namespace mcpp::byte_span {
 
