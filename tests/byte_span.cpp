@@ -209,6 +209,25 @@ static_assert(!is_container_compatible_v<const char (&)[4], std::byte>);
 static_assert(is_container_compatible_v<char (&)[4], std::byte>);
 static_assert(is_container_compatible_v<char (&)[4], const std::byte>);
 
+// byte_cast
+static_assert(std::is_same_v<decltype(byte_cast<char>(std::declval<const std::byte *>())), const char *>);
+static_assert(std::is_same_v<decltype(byte_cast<char>(std::declval<std::byte *>())), char *>);
+
+// member functions
+static_assert(std::is_same_v<decltype(std::declval<mut_byte_view>().u8data()), uint8_t *>);
+static_assert(std::is_same_v<decltype(std::declval<mut_byte_view>().cdata()), char *>);
+static_assert(std::is_same_v<decltype(std::declval<mut_byte_view>().ucdata()), unsigned char *>);
+static_assert(std::is_same_v<decltype(std::declval<mut_byte_view>().begin<uint8_t>()), uint8_t *>);
+static_assert(std::is_same_v<decltype(std::declval<mut_byte_view>().begin<char>()), char *>);
+static_assert(std::is_same_v<decltype(std::declval<mut_byte_view>().begin<unsigned char>()), unsigned char *>);
+
+static_assert(std::is_same_v<decltype(std::declval<byte_view>().u8data()), const uint8_t *>);
+static_assert(std::is_same_v<decltype(std::declval<byte_view>().cdata()), const char *>);
+static_assert(std::is_same_v<decltype(std::declval<byte_view>().ucdata()), const unsigned char *>);
+static_assert(std::is_same_v<decltype(std::declval<byte_view>().begin<uint8_t>()), const uint8_t *>);
+static_assert(std::is_same_v<decltype(std::declval<byte_view>().begin<char>()), const char *>);
+static_assert(std::is_same_v<decltype(std::declval<byte_view>().begin<unsigned char>()), const unsigned char *>);
+
 } // namespace mcpp::byte_span::detail
 
 // runtime tests

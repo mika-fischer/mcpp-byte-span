@@ -132,10 +132,19 @@ constexpr auto subspan_extent(std::size_t offset, std::size_t count, std::size_t
 
 } // namespace detail
 
-template <typename T, typename U, std::enable_if_t<detail::is_compatible_v<U, T>, int> = 0>
-constexpr auto byte_cast(U *ptr) noexcept -> T * {
+template <typename T, typename U>
+constexpr auto byte_cast(U *ptr) noexcept {
+    static_assert(!std::is_pointer_v<T>);
+    static_assert(!std::is_const_v<T>);
+    static_assert(!std::is_pointer_v<U>);
     // TODO: Would be nice to have something constexpr compatible here
-    return static_cast<T *>(static_cast<std::conditional_t<std::is_const_v<U>, const void *, void *>>(ptr));
+    if constexpr (std::is_const_v<U>) {
+        static_assert(detail::is_compatible_v<U, const T>);
+        return static_cast<const T *>(static_cast<const void *>(ptr));
+    } else {
+        static_assert(detail::is_compatible_v<U, T>);
+        return static_cast<T *>(static_cast<void *>(ptr));
+    }
 }
 
 template <typename T, std::size_t Extent>
@@ -168,7 +177,7 @@ class basic_byte_span : public detail::basic_byte_span_storage<T, Extent> {
 
     // Pointer & size (2)
     template <typename U, std::enable_if_t<detail::is_compatible_v<std::remove_pointer_t<U>, T>, int> = 0>
-    constexpr basic_byte_span(U *ptr, std::size_t count) noexcept : storage_type(byte_cast<T>(ptr), count) {}
+    constexpr basic_byte_span(U *ptr, std::size_t count) noexcept : storage_type(byte_cast<std::byte>(ptr), count) {}
 
     // Two pointers (3)
     template <typename U, std::enable_if_t<detail::is_compatible_v<std::remove_pointer_t<U>, T>, int> = 0>
@@ -181,13 +190,13 @@ class basic_byte_span : public detail::basic_byte_span_storage<T, Extent> {
                                    detail::is_container_compatible_v<U (&)[N], T> && !std::is_same_v<U, const char>,
                                int> = 0>
     // NOLINTNEXTLINE(hicpp-explicit-conversions)
-    constexpr basic_byte_span(U (&arr)[N]) noexcept : storage_type(byte_cast<T>(arr), N) {}
+    constexpr basic_byte_span(U (&arr)[N]) noexcept : storage_type(byte_cast<std::byte>(arr), N) {}
 
     template <std::size_t N, std::enable_if_t<(N == Extent || Extent == dynamic_extent) &&
                                                   detail::is_container_compatible_v<const char (&)[N], T>,
                                               int> = 0>
     // NOLINTNEXTLINE(hicpp-explicit-conversions)
-    explicit constexpr basic_byte_span(const char (&arr)[N]) noexcept : storage_type(byte_cast<T>(arr), N) {}
+    explicit constexpr basic_byte_span(const char (&arr)[N]) noexcept : storage_type(byte_cast<std::byte>(arr), N) {}
 
     template <
         typename U, std::size_t N,
@@ -201,7 +210,7 @@ class basic_byte_span : public detail::basic_byte_span_storage<T, Extent> {
               std::enable_if_t<
                   (E == dynamic_extent || N == E) && detail::is_container_compatible_v<std::array<U, N> &, T>, int> = 0>
     // NOLINTNEXTLINE(hicpp-explicit-conversions)
-    constexpr basic_byte_span(std::array<U, N> &arr) noexcept : storage_type(byte_cast<T>(arr.data()), N) {}
+    constexpr basic_byte_span(std::array<U, N> &arr) noexcept : storage_type(byte_cast<std::byte>(arr.data()), N) {}
 
     // const std::array (6)
     template <
@@ -209,7 +218,8 @@ class basic_byte_span : public detail::basic_byte_span_storage<T, Extent> {
         std::enable_if_t<
             (E == dynamic_extent || N == E) && detail::is_container_compatible_v<const std::array<U, N> &, T>, int> = 0>
     // NOLINTNEXTLINE(hicpp-explicit-conversions)
-    constexpr basic_byte_span(const std::array<U, N> &arr) noexcept : storage_type(byte_cast<T>(arr.data()), N) {}
+    constexpr basic_byte_span(const std::array<U, N> &arr) noexcept
+        : storage_type(byte_cast<std::byte>(arr.data()), N) {}
 
     // rvalue std::array
     template <
@@ -224,7 +234,7 @@ class basic_byte_span : public detail::basic_byte_span_storage<T, Extent> {
                                    detail::is_container_compatible_v<Container &, T>,
                                int> = 0>
     // NOLINTNEXTLINE(hicpp-explicit-conversions)
-    constexpr basic_byte_span(Container &cont) : storage_type(byte_cast<T>(std::data(cont)), std::size(cont)) {}
+    constexpr basic_byte_span(Container &cont) : storage_type(byte_cast<std::byte>(std::data(cont)), std::size(cont)) {}
 
     // rvalue generic container
     template <typename Container, std::size_t E = Extent,
@@ -240,7 +250,7 @@ class basic_byte_span : public detail::basic_byte_span_storage<T, Extent> {
                                int> = 0>
     // NOLINTNEXTLINE(hicpp-explicit-conversions)
     constexpr basic_byte_span(const basic_byte_span<U, N> &source) noexcept
-        : storage_type(byte_cast<T>(source.data()), source.size()) {}
+        : storage_type(byte_cast<std::byte>(source.data()), source.size()) {}
 
     ///////////////////////////////////////////////////////////////////////////
     // extra
@@ -254,7 +264,7 @@ class basic_byte_span : public detail::basic_byte_span_storage<T, Extent> {
               std::enable_if_t<std::is_const_v<U> && E == dynamic_extent, int> = 0>
     // NOLINTNEXTLINE(hicpp-explicit-conversions)
     constexpr basic_byte_span(std::string_view string_view) noexcept
-        : storage_type(byte_cast<const std::byte>(string_view.data()), string_view.size()) {}
+        : storage_type(byte_cast<std::byte>(string_view.data()), string_view.size()) {}
 
     // span
     template <
