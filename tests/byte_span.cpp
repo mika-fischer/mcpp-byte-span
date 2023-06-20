@@ -98,9 +98,11 @@ static_assert(test_implicit<false, false, false, false, const char (&)[2]>());
 static_assert(test_explicit<true, true, false, false, const char (&)[4]>());
 static_assert(test_explicit<true, false, false, false, const char (&)[2]>());
 
-// rvalue C array
-static_assert(test<false, false, false, false, std::byte (&&)[4]>());
-static_assert(test<false, false, false, false, std::byte (&&)[2]>());
+// C array
+static_assert(test_implicit<true, true, true, true, std::byte (&&)[4]>());
+static_assert(test_implicit<true, false, true, false, std::byte (&&)[2]>());
+static_assert(test_implicit<true, true, true, true, char (&&)[4]>());
+static_assert(test_implicit<true, false, true, false, char (&&)[2]>());
 
 // string literal
 static_assert(test_implicit<false, false, false, false, decltype("foo")>());
@@ -113,13 +115,13 @@ static_assert(test_implicit<true, true, true, true, std::array<std::byte, 4> &>(
 static_assert(test_implicit<true, false, true, false, std::array<std::byte, 2> &>());
 static_assert(test_implicit<true, true, false, false, const std::array<std::byte, 4> &>());
 static_assert(test_implicit<true, false, false, false, const std::array<std::byte, 2> &>());
-static_assert(test<false, false, false, false, std::array<std::byte, 4> &&>());
-static_assert(test<false, false, false, false, std::array<std::byte, 2> &&>());
+static_assert(test_implicit<true, true, true, true, std::array<std::byte, 4> &&>());
+static_assert(test_implicit<true, false, true, false, std::array<std::byte, 2> &&>());
 
 // Container
 static_assert(test_implicit<true, false, true, false, std::vector<std::byte> &>());
 static_assert(test_implicit<true, false, false, false, const std::vector<std::byte> &>());
-static_assert(test<false, false, false, false, std::vector<std::byte> &&>());
+static_assert(test_implicit<true, false, true, false, std::vector<std::byte> &&>());
 
 // nullptr
 static_assert(test_implicit<true, false, true, false, std::nullptr_t>());

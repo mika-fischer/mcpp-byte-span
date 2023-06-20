@@ -203,7 +203,7 @@ class basic_byte_span : public detail::basic_byte_span_storage<T, Extent> {
         std::enable_if_t<(N == Extent || Extent == dynamic_extent) && detail::is_container_compatible_v<U (&&)[N], T>,
                          int> = 0>
     // NOLINTNEXTLINE(hicpp-explicit-conversions)
-    constexpr basic_byte_span(U (&&arr)[N]) noexcept = delete;
+    constexpr basic_byte_span(U (&&arr)[N]) noexcept : storage_type(byte_cast<std::byte>(arr), N) {}
 
     // std::array (5)
     template <typename U, std::size_t N, std::size_t E = Extent,
@@ -224,9 +224,10 @@ class basic_byte_span : public detail::basic_byte_span_storage<T, Extent> {
     // rvalue std::array
     template <
         typename U, std::size_t N, std::size_t E = Extent,
-        std::enable_if_t<
-            (E == dynamic_extent || N == E) && detail::is_container_compatible_v<const std::array<U, N> &, T>, int> = 0>
-    constexpr basic_byte_span(std::array<U, N> &&arr) noexcept = delete;
+        std::enable_if_t<(E == dynamic_extent || N == E) && detail::is_container_compatible_v<std::array<U, N> &&, T>,
+                         int> = 0>
+    // NOLINTNEXTLINE(hicpp-explicit-conversions)
+    constexpr basic_byte_span(std::array<U, N> &&arr) noexcept : storage_type(byte_cast<std::byte>(arr.data()), N) {}
 
     // generic container
     template <typename Container, std::size_t E = Extent,
@@ -234,14 +235,9 @@ class basic_byte_span : public detail::basic_byte_span_storage<T, Extent> {
                                    detail::is_container_compatible_v<Container &, T>,
                                int> = 0>
     // NOLINTNEXTLINE(hicpp-explicit-conversions)
-    constexpr basic_byte_span(Container &cont) : storage_type(byte_cast<std::byte>(std::data(cont)), std::size(cont)) {}
-
-    // rvalue generic container
-    template <typename Container, std::size_t E = Extent,
-              std::enable_if_t<E == dynamic_extent && detail::is_container_v<Container> &&
-                                   detail::is_container_compatible_v<Container &&, T>,
-                               int> = 0>
-    constexpr basic_byte_span(Container &&cont) = delete;
+    constexpr basic_byte_span(Container &&cont)
+        : storage_type(byte_cast<std::byte>(std::data(std::forward<Container>(cont))),
+                       std::size(std::forward<Container>(cont))) {}
 
     // Conversions
     template <class U, std::size_t N,
