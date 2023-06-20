@@ -60,6 +60,26 @@ constexpr auto test_explicit() -> bool {
     return true;
 }
 
+// basic_byte_span<T, N> -> basic_byte_span<U, M>
+static_assert(test_implicit<true, false, true, false, mut_byte_span<> &>());
+static_assert(test_implicit<true, false, true, false, const mut_byte_span<> &>());
+static_assert(test_implicit<true, false, true, false, mut_byte_span<> &&>());
+static_assert(test_implicit<true, true, true, true, mut_byte_span<4> &>());
+static_assert(test_implicit<true, true, true, true, const mut_byte_span<4> &>());
+static_assert(test_implicit<true, true, true, true, mut_byte_span<4> &&>());
+static_assert(test_implicit<true, false, true, false, mut_byte_span<2> &>());
+static_assert(test_implicit<true, false, true, false, const mut_byte_span<2> &>());
+static_assert(test_implicit<true, false, true, false, mut_byte_span<2> &&>());
+static_assert(test_implicit<true, false, false, false, byte_span<> &>());
+static_assert(test_implicit<true, false, false, false, const byte_span<> &>());
+static_assert(test_implicit<true, false, false, false, byte_span<> &&>());
+static_assert(test_implicit<true, true, false, false, byte_span<4> &>());
+static_assert(test_implicit<true, true, false, false, const byte_span<4> &>());
+static_assert(test_implicit<true, true, false, false, byte_span<4> &&>());
+static_assert(test_implicit<true, false, false, false, byte_span<2> &>());
+static_assert(test_implicit<true, false, false, false, const byte_span<2> &>());
+static_assert(test_implicit<true, false, false, false, byte_span<2> &&>());
+
 // Pointer & size
 static_assert(test<true, true, false, false, const std::byte *, std::size_t>());
 static_assert(test<true, true, true, true, std::byte *, std::size_t>());

@@ -234,6 +234,15 @@ class basic_byte_span : public detail::basic_byte_span_storage<T, Extent> {
                                int> = 0>
     constexpr basic_byte_span(Container &&cont) = delete;
 
+    // Conversions
+    template <class U, std::size_t N,
+              std::enable_if_t<(!std::is_same_v<U, T> || N != Extent) && (Extent == dynamic_extent || N == Extent) &&
+                                   detail::is_container_compatible_v<basic_byte_span<U, N> &, T>,
+                               int> = 0>
+    // NOLINTNEXTLINE(hicpp-explicit-conversions)
+    constexpr basic_byte_span(const basic_byte_span<U, N> &source) noexcept
+        : storage_type(byte_cast<T>(source.data()), source.size()) {}
+
     ///////////////////////////////////////////////////////////////////////////
     // extra
     // nullptr
