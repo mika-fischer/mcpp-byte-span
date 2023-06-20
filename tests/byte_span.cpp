@@ -109,6 +109,29 @@ static_assert(test_implicit<true, false, false, false, std::string_view &>());
 static_assert(test_implicit<true, false, false, false, const std::string_view &>());
 static_assert(test_implicit<true, false, false, false, std::string_view &&>());
 
+template <typename T>
+struct myspan {
+    static constexpr std::size_t extent = dynamic_extent;
+    auto size_bytes() noexcept -> std::size_t;
+    template <std::size_t, std::size_t>
+    auto subspan() -> myspan;
+    auto data() -> T *;
+};
+static_assert(is_span_like_v<myspan<char>>);
+static_assert(test_implicit<true, false, true, false, myspan<char> &>());
+static_assert(test_implicit<true, false, true, false, const myspan<char> &>());
+static_assert(test_implicit<true, false, true, false, myspan<char> &&>());
+static_assert(test_implicit<true, false, false, false, myspan<const char> &>());
+static_assert(test_implicit<true, false, false, false, const myspan<const char> &>());
+static_assert(test_implicit<true, false, false, false, myspan<const char> &&>());
+struct foo {};
+static_assert(test<false, false, false, false, myspan<foo> &>());
+static_assert(test<false, false, false, false, const myspan<foo> &>());
+static_assert(test<false, false, false, false, myspan<foo> &&>());
+static_assert(test<false, false, false, false, myspan<const foo> &>());
+static_assert(test<false, false, false, false, const myspan<const foo> &>());
+static_assert(test<false, false, false, false, myspan<const foo> &&>());
+
 // is_byte_like
 static_assert(is_byte_like_v<char>);
 static_assert(is_byte_like_v<unsigned char>);
