@@ -130,10 +130,7 @@ constexpr auto subspan_extent(std::size_t offset, std::size_t count, std::size_t
 
 } // namespace detail
 
-template <
-    typename T, typename U,
-    std::enable_if_t<
-        detail::is_byte_like_v<T> && detail::is_byte_like_v<U> && (std::is_const_v<T> || !std::is_const_v<U>), int> = 0>
+template <typename T, typename U, std::enable_if_t<detail::is_compatible_v<U, T>, int> = 0>
 constexpr auto byte_cast(U *ptr) noexcept -> T * {
     // TODO: Would be nice to have something constexpr compatible here
     return static_cast<T *>(static_cast<std::conditional_t<std::is_const_v<U>, const void *, void *>>(ptr));
