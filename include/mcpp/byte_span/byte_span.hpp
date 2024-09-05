@@ -181,7 +181,7 @@ class basic_byte_span : public detail::basic_byte_span_storage<T, Extent> {
 
     // Two pointers (3)
     template <typename U, std::enable_if_t<detail::is_compatible_v<std::remove_pointer_t<U>, T>, int> = 0>
-    constexpr basic_byte_span(U *first, U *last) noexcept : storage_type(first, last - first) {}
+    constexpr basic_byte_span(U *first, U *last) noexcept : storage_type(byte_cast<std::byte>(first), last - first) {}
 
     // C bounded array (4)
     // (except for string literals, because this is error-prone due to the included zero-byte at the end)
@@ -313,8 +313,8 @@ class basic_byte_span : public detail::basic_byte_span_storage<T, Extent> {
     [[nodiscard]] constexpr auto first() const noexcept -> basic_byte_span<element_type, Count> {
         return {data(), Count};
     }
-    [[nodiscard]] constexpr auto first(std::size_t Count) const noexcept
-        -> basic_byte_span<element_type, dynamic_extent> {
+    [[nodiscard]] constexpr auto
+    first(std::size_t Count) const noexcept -> basic_byte_span<element_type, dynamic_extent> {
         return {data(), Count};
     }
 
@@ -323,15 +323,15 @@ class basic_byte_span : public detail::basic_byte_span_storage<T, Extent> {
     [[nodiscard]] constexpr auto last() const noexcept -> basic_byte_span<element_type, Count> {
         return {data() + (size() - Count), Count};
     }
-    [[nodiscard]] constexpr auto last(std::size_t Count) const noexcept
-        -> basic_byte_span<element_type, dynamic_extent> {
+    [[nodiscard]] constexpr auto
+    last(std::size_t Count) const noexcept -> basic_byte_span<element_type, dynamic_extent> {
         return {data() + (size() - Count), Count};
     }
 
     // subspan (https://en.cppreference.com/w/cpp/container/span/subspan)
     template <std::size_t Offset, std::size_t Count = dynamic_extent>
-    [[nodiscard]] constexpr auto subspan() const noexcept
-        -> basic_byte_span<element_type, detail::subspan_extent(Offset, Count, extent)> {
+    [[nodiscard]] constexpr auto
+    subspan() const noexcept -> basic_byte_span<element_type, detail::subspan_extent(Offset, Count, extent)> {
         return {data() + Offset, Count != dynamic_extent ? Count : size() - Offset};
     }
     [[nodiscard]] constexpr auto subspan(std::size_t Offset, std::size_t Count = dynamic_extent) const noexcept
