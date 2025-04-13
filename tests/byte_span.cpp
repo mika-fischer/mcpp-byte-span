@@ -4,6 +4,7 @@
 
 #include "mcpp/byte_span/byte_span.hpp"
 
+#include <array>
 #include <compare>
 #include <span>
 #include <string_view>
