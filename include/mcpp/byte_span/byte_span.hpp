@@ -47,7 +47,8 @@ template <typename T>
 concept span_like = std::ranges::contiguous_range<T> && requires(T &span) {
     { T::extent } -> std::same_as<const std::size_t &>;
     { span.size_bytes() } -> std::same_as<std::size_t>;
-    { span.template subspan<0, T::extent>() } -> std::same_as<T>;
+    { span.template subspan<0, 0>() };
+    { span.subspan(0, dynamic_extent) };
 };
 
 } // namespace detail

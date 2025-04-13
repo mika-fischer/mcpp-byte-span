@@ -137,8 +137,9 @@ template <typename T>
 struct myspan {
     static constexpr std::size_t extent = dynamic_extent;
     auto size_bytes() noexcept -> std::size_t;
-    template <std::size_t, std::size_t>
+    template <std::size_t, std::size_t = dynamic_extent>
     auto subspan() -> myspan;
+    auto subspan(std::size_t, std::size_t = dynamic_extent) -> myspan;
     auto data() -> T * { return nullptr; };
     [[nodiscard]] auto size() const -> std::size_t;
     auto begin() -> T * { return nullptr; }
@@ -246,23 +247,27 @@ static_assert(requires(const mut_byte_view view) {
     { view.u8data() } -> std::same_as<uint8_t *>;
     { view.cdata() } -> std::same_as<char *>;
     { view.ucdata() } -> std::same_as<unsigned char *>;
+#if !defined(_MSC_VER) || _MSC_VER >= 1930
     { view.begin<uint8_t>() } -> std::same_as<uint8_t *>;
     { view.begin<char>() } -> std::same_as<char *>;
     { view.begin<unsigned char>() } -> std::same_as<unsigned char *>;
     { view.begin<const uint8_t>() } -> std::same_as<const uint8_t *>;
     { view.begin<const char>() } -> std::same_as<const char *>;
     { view.begin<const unsigned char>() } -> std::same_as<const unsigned char *>;
+#endif
 });
 static_assert(requires(const byte_view view) {
     { view.u8data() } -> std::same_as<const uint8_t *>;
     { view.cdata() } -> std::same_as<const char *>;
     { view.ucdata() } -> std::same_as<const unsigned char *>;
+#if !defined(_MSC_VER) || _MSC_VER >= 1930
     { view.begin<uint8_t>() } -> std::same_as<const uint8_t *>;
     { view.begin<char>() } -> std::same_as<const char *>;
     { view.begin<unsigned char>() } -> std::same_as<const unsigned char *>;
     { view.begin<const uint8_t>() } -> std::same_as<const uint8_t *>;
     { view.begin<const char>() } -> std::same_as<const char *>;
     { view.begin<const unsigned char>() } -> std::same_as<const unsigned char *>;
+#endif
 });
 
 static_assert(requires(byte_view a, mut_byte_view b, byte_span<4> c, mut_byte_span<4> d) {
