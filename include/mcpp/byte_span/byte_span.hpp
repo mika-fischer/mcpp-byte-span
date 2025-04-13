@@ -116,7 +116,7 @@ template <typename To, typename From>
     return static_cast<detail::const_like_t<From, To> *>(static_cast<detail::const_like_t<From, void> *>(ptr));
 }
 
-template <typename T, std::size_t Extent>
+template <typename T, std::size_t Extent = dynamic_extent>
     requires std::same_as<std::remove_const_t<T>, std::byte>
 class basic_byte_span : public detail::basic_byte_span_storage<T, Extent> {
   private:
