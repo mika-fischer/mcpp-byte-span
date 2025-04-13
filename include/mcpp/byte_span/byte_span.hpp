@@ -4,84 +4,58 @@
 
 #pragma once
 
-#include <algorithm>   // std::lexicographical_compare
-#include <array>       // std::array
-#include <cstddef>     // std::size_t
-#include <cstdint>     // SIZE_MAX
-#include <cstring>     // std::memcmp
-#include <iterator>    // std::data, std::size
-#include <string_view> // std::string_view
-#include <type_traits> // std::false_type, std::true_type, std::void_t, ...
-#include <utility>     // std::declval
+#include <algorithm>   // equal, lexicographical_compare_three_way
+#include <concepts>    // various
+#include <cstddef>     // size_t, byte
+#include <cstdint>     // uint8_t, SIZE_MAX
+#include <iterator>    // data, size, reverse_iterator
+#include <ranges>      // contiguous_range
+#include <type_traits> // various
+#include <utility>     // declval, forward
 
 namespace mcpp::byte_span {
 
 constexpr inline std::size_t dynamic_extent = SIZE_MAX;
 
-template <typename T, std::size_t Extent = dynamic_extent>
-class basic_byte_span;
+template <typename T>
+concept byte_like = std::same_as<T, std::byte> || std::same_as<T, char> || std::same_as<T, unsigned char>;
+
+template <typename From, typename To>
+concept byte_aliasable = byte_like<std::remove_const_t<From>> && byte_like<std::remove_const_t<To>> &&
+                         (std::is_const_v<To> || !std::is_const_v<From>);
 
 namespace detail {
 
-template <typename>
-struct is_byte_span : std::false_type {};
-template <typename T, std::size_t S>
-struct is_byte_span<basic_byte_span<T, S>> : std::true_type {};
+template <std::ranges::contiguous_range T>
+using container_element_t = std::remove_pointer_t<decltype(std::data(std::declval<T &>()))>;
+
+template <std::ranges::contiguous_range T>
+constexpr auto extent() noexcept -> std::size_t {
+    using U = std::remove_cvref_t<T>;
+    if constexpr (std::is_array_v<U>) {
+        return std::extent_v<U>;
+    } else if constexpr (requires { std::tuple_size<U>::value; }) {
+        return std::tuple_size_v<U>;
+    } else if constexpr (requires { U::extent; }) {
+        return U::extent;
+    } else {
+        return dynamic_extent;
+    }
+}
+
 template <typename T>
-constexpr inline bool is_byte_span_v = is_byte_span<T>::value;
+concept span_like = std::ranges::contiguous_range<T> && requires(T &span) {
+    { T::extent } -> std::same_as<const std::size_t &>;
+    { span.size_bytes() } -> std::same_as<std::size_t>;
+    { span.template subspan<0, T::extent>() } -> std::same_as<T>;
+};
 
-template <typename>
-struct is_std_array : std::false_type {};
-template <typename T, std::size_t N>
-struct is_std_array<std::array<T, N>> : std::true_type {};
-template <typename T>
-constexpr inline bool is_std_array_v = is_std_array<T>::value;
+} // namespace detail
 
-template <typename>
-struct is_std_string_view : std::false_type {};
-template <typename CharT, typename Traits>
-struct is_std_string_view<std::basic_string_view<CharT, Traits>> : std::true_type {};
-template <typename T>
-constexpr inline bool is_std_string_view_v = is_std_string_view<T>::value;
+template <typename R, typename To>
+concept byte_aliasable_range = std::ranges::contiguous_range<R> && byte_aliasable<detail::container_element_t<R>, To>;
 
-template <typename, typename = void>
-struct is_span_like : std::false_type {};
-template <typename T>
-struct is_span_like<T, std::void_t<decltype(T::extent), decltype(std::declval<T>().size_bytes()),
-                                   decltype(std::declval<T>().template subspan<0, 1>())>> : std::true_type {};
-template <typename T>
-constexpr inline bool is_span_like_v = is_span_like<T>::value;
-
-template <typename, typename = void>
-struct has_size_and_data : std::false_type {};
-template <typename T>
-struct has_size_and_data<T, std::void_t<decltype(std::size(std::declval<T>())), decltype(std::data(std::declval<T>()))>>
-    : std::true_type {};
-template <typename T>
-constexpr inline bool has_size_and_data_v = has_size_and_data<T>::value;
-
-template <typename Container>
-using container_element_type =
-    std::remove_pointer_t<decltype(std::data(std::declval<std::add_lvalue_reference_t<Container>>()))>;
-
-template <typename T, typename U = std::remove_cv_t<T>>
-constexpr inline bool is_byte_like_v = std::is_same_v<U, std::byte> || std::is_same_v<U, char> ||
-                                       std::is_same_v<U, unsigned char> || std::is_same_v<U, void>;
-
-template <typename Container, typename U = std::remove_cv_t<std::remove_reference_t<Container>>>
-constexpr inline bool is_container_v = !is_byte_span_v<U> && !std::is_array_v<U> && !is_std_array_v<U> &&
-                                       !is_std_string_view_v<U> && !is_span_like_v<U> && has_size_and_data_v<Container>;
-
-template <typename T, typename U>
-constexpr bool is_compatible_v = is_byte_like_v<T> && is_byte_like_v<U> && (std::is_const_v<U> || !std::is_const_v<T>);
-
-template <typename Container, typename U, typename = void>
-struct is_container_compatible : std::false_type {};
-template <typename Container, typename U>
-struct is_container_compatible<Container, U, std::enable_if_t<is_compatible_v<container_element_type<Container>, U>>>
-    : std::true_type {};
-template <typename Container, typename U>
-constexpr bool is_container_compatible_v = is_container_compatible<Container, U>::value;
+namespace detail {
 
 template <typename T, std::size_t Extent>
 class basic_byte_span_storage {
@@ -120,7 +94,7 @@ class basic_byte_span_storage<T, dynamic_extent> {
 };
 
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
-constexpr auto subspan_extent(std::size_t offset, std::size_t count, std::size_t extent) -> std::size_t {
+constexpr auto subspan_extent(std::size_t offset, std::size_t count, std::size_t extent) noexcept -> std::size_t {
     if (count != dynamic_extent) {
         return count;
     }
@@ -130,27 +104,21 @@ constexpr auto subspan_extent(std::size_t offset, std::size_t count, std::size_t
     return dynamic_extent;
 }
 
+template <typename T, typename U>
+using const_like_t = std::conditional_t<std::is_const_v<T>, const U, U>;
+
 } // namespace detail
 
-template <typename T, typename U>
-constexpr auto byte_cast(U *ptr) noexcept {
-    static_assert(!std::is_pointer_v<T>);
-    static_assert(!std::is_const_v<T>);
-    static_assert(!std::is_pointer_v<U>);
-    // TODO: Would be nice to have something constexpr compatible here
-    if constexpr (std::is_const_v<U>) {
-        static_assert(detail::is_compatible_v<U, const T>);
-        return static_cast<const T *>(static_cast<const void *>(ptr));
-    } else {
-        static_assert(detail::is_compatible_v<U, T>);
-        return static_cast<T *>(static_cast<void *>(ptr));
-    }
+template <typename To, typename From>
+    requires byte_aliasable<From, detail::const_like_t<From, To>>
+[[nodiscard]] constexpr auto byte_cast(From *ptr) noexcept -> detail::const_like_t<From, To> * {
+    return static_cast<detail::const_like_t<From, To> *>(static_cast<detail::const_like_t<From, void> *>(ptr));
 }
 
 template <typename T, std::size_t Extent>
+    requires std::same_as<std::remove_const_t<T>, std::byte>
 class basic_byte_span : public detail::basic_byte_span_storage<T, Extent> {
   private:
-    static_assert(std::is_same_v<std::remove_cv_t<T>, std::byte>);
     using storage_type = detail::basic_byte_span_storage<T, Extent>;
 
   public:
@@ -163,8 +131,10 @@ class basic_byte_span : public detail::basic_byte_span_storage<T, Extent> {
     using const_pointer = const T *;
     using reference = T &;
     using const_reference = const T &;
-    using iterator = pointer;
-    using reverse_iterator = std::reverse_iterator<iterator>;
+    using iterator = T *;
+    using const_iterator = const T *;
+    using reverse_iterator = std::reverse_iterator<T *>;
+    using const_reverse_iterator = std::reverse_iterator<const T *>;
 
     // Member constant
     static constexpr std::size_t extent = Extent;
@@ -172,127 +142,87 @@ class basic_byte_span : public detail::basic_byte_span_storage<T, Extent> {
     // Member functions
     // Constructor (https://en.cppreference.com/w/cpp/container/span/span)
     // Default (1)
-    template <std::size_t E = Extent, std::enable_if_t<E == 0 || E == dynamic_extent, int> = 0>
-    constexpr basic_byte_span() noexcept {}
+    constexpr basic_byte_span() noexcept
+        requires(Extent == 0 || Extent == dynamic_extent)
+    = default;
 
     // Pointer & size (2)
-    template <typename U, std::enable_if_t<detail::is_compatible_v<std::remove_pointer_t<U>, T>, int> = 0>
-    constexpr basic_byte_span(U *ptr, std::size_t count) noexcept : storage_type(byte_cast<std::byte>(ptr), count) {}
+    template <byte_aliasable<T> U>
+    constexpr basic_byte_span(U *ptr, std::size_t count) noexcept : storage_type(byte_cast<T>(ptr), count) {}
 
     // Two pointers (3)
-    template <typename U, std::enable_if_t<detail::is_compatible_v<std::remove_pointer_t<U>, T>, int> = 0>
-    constexpr basic_byte_span(U *first, U *last) noexcept : storage_type(byte_cast<std::byte>(first), last - first) {}
+    template <byte_aliasable<T> U>
+    constexpr basic_byte_span(U *first, U *last) noexcept : storage_type(byte_cast<T>(first), last - first) {}
 
     // C bounded array (4)
     // (except for string literals, because this is error-prone due to the included zero-byte at the end)
-    template <typename U, std::size_t N,
-              std::enable_if_t<(N == Extent || Extent == dynamic_extent) &&
-                                   detail::is_container_compatible_v<U (&)[N], T> && !std::is_same_v<U, const char>,
-                               int> = 0>
-    // NOLINTNEXTLINE(hicpp-explicit-conversions)
-    constexpr basic_byte_span(U (&arr)[N]) noexcept : storage_type(byte_cast<std::byte>(arr), N) {}
+    template <byte_aliasable<T> U, std::size_t N>
+        requires(N == Extent || Extent == dynamic_extent)
+    explicit(std::same_as<U, const char>) constexpr basic_byte_span(U (&arr)[N]) noexcept
+        : storage_type(byte_cast<T>(arr), N) {
+        static_assert(!std::same_as<std::remove_cvref_t<U>, char>);
+    }
 
-    template <std::size_t N, std::enable_if_t<(N == Extent || Extent == dynamic_extent) &&
-                                                  detail::is_container_compatible_v<const char (&)[N], T>,
-                                              int> = 0>
+    template <byte_aliasable<T> U, std::size_t N>
+        requires(N == Extent || Extent == dynamic_extent)
     // NOLINTNEXTLINE(hicpp-explicit-conversions)
-    explicit constexpr basic_byte_span(const char (&arr)[N]) noexcept : storage_type(byte_cast<std::byte>(arr), N) {}
+    explicit(std::same_as<U, const char>) constexpr basic_byte_span(U (&&arr)[N]) noexcept
+        : storage_type(byte_cast<std::byte>(std::move(arr)), N) {
+        static_assert(!std::same_as<std::remove_cvref_t<U>, char>);
+    }
 
-    template <
-        typename U, std::size_t N,
-        std::enable_if_t<(N == Extent || Extent == dynamic_extent) && detail::is_container_compatible_v<U (&&)[N], T>,
-                         int> = 0>
-    // NOLINTNEXTLINE(hicpp-explicit-conversions)
-    constexpr basic_byte_span(U (&&arr)[N]) noexcept : storage_type(byte_cast<std::byte>(arr), N) {}
-
-    // std::array (5)
-    template <typename U, std::size_t N, std::size_t E = Extent,
-              std::enable_if_t<
-                  (E == dynamic_extent || N == E) && detail::is_container_compatible_v<std::array<U, N> &, T>, int> = 0>
-    // NOLINTNEXTLINE(hicpp-explicit-conversions)
-    constexpr basic_byte_span(std::array<U, N> &arr) noexcept : storage_type(byte_cast<std::byte>(arr.data()), N) {}
-
-    // const std::array (6)
-    template <
-        typename U, std::size_t N, std::size_t E = Extent,
-        std::enable_if_t<
-            (E == dynamic_extent || N == E) && detail::is_container_compatible_v<const std::array<U, N> &, T>, int> = 0>
-    // NOLINTNEXTLINE(hicpp-explicit-conversions)
-    constexpr basic_byte_span(const std::array<U, N> &arr) noexcept
-        : storage_type(byte_cast<std::byte>(arr.data()), N) {}
-
-    // rvalue std::array
-    template <
-        typename U, std::size_t N, std::size_t E = Extent,
-        std::enable_if_t<(E == dynamic_extent || N == E) && detail::is_container_compatible_v<std::array<U, N> &&, T>,
-                         int> = 0>
-    // NOLINTNEXTLINE(hicpp-explicit-conversions)
-    constexpr basic_byte_span(std::array<U, N> &&arr) noexcept : storage_type(byte_cast<std::byte>(arr.data()), N) {}
-
-    // generic container
-    template <typename Container, std::size_t E = Extent,
-              std::enable_if_t<E == dynamic_extent && detail::is_container_v<Container> &&
-                                   detail::is_container_compatible_v<Container &, T>,
-                               int> = 0>
-    // NOLINTNEXTLINE(hicpp-explicit-conversions)
-    constexpr basic_byte_span(Container &&cont)
-        : storage_type(byte_cast<std::byte>(std::data(std::forward<Container>(cont))),
-                       std::size(std::forward<Container>(cont))) {}
+    // generic contiguous range
+    template <std::ranges::contiguous_range R>
+        requires(Extent == dynamic_extent || detail::extent<R>() == Extent) &&
+                (!std::is_array_v<std::remove_cvref_t<R>>) && byte_aliasable_range<R &, T>
+    // NOLINTNEXTLINE(hicpp-explicit-conversions,cppcoreguidelines-missing-std-forward)
+    constexpr basic_byte_span(R &&cont) : storage_type(byte_cast<T>(std::data(cont)), std::size(cont)) {}
 
     // Conversions
-    template <class U, std::size_t N,
-              std::enable_if_t<(!std::is_same_v<U, T> || N != Extent) && (Extent == dynamic_extent || N == Extent) &&
-                                   detail::is_container_compatible_v<basic_byte_span<U, N> &, T>,
-                               int> = 0>
+    template <byte_aliasable<T> U, std::size_t N>
+        requires(!std::same_as<U, T> || N != Extent) && (Extent == dynamic_extent || N == Extent)
     // NOLINTNEXTLINE(hicpp-explicit-conversions)
     constexpr basic_byte_span(const basic_byte_span<U, N> &source) noexcept
-        : storage_type(byte_cast<std::byte>(source.data()), source.size()) {}
+        : storage_type(byte_cast<T>(source.data()), source.size()) {}
 
     ///////////////////////////////////////////////////////////////////////////
     // extra
     // nullptr
-    template <std::size_t E = Extent, std::enable_if_t<(E == dynamic_extent || E <= 0), int> = 0>
     // NOLINTNEXTLINE(hicpp-explicit-conversions)
-    constexpr basic_byte_span(std::nullptr_t) noexcept {}
-
-    // std::string_view
-    template <typename U = T, std::size_t E = Extent,
-              std::enable_if_t<std::is_const_v<U> && E == dynamic_extent, int> = 0>
-    // NOLINTNEXTLINE(hicpp-explicit-conversions)
-    constexpr basic_byte_span(std::string_view string_view) noexcept
-        : storage_type(byte_cast<std::byte>(string_view.data()), string_view.size()) {}
-
-    // span
-    template <
-        typename Span, std::size_t E1 = Extent,
-        std::enable_if_t<!detail::is_byte_span_v<Span> && detail::is_span_like_v<Span> &&
-                             (E1 == dynamic_extent || E1 == Span::extent) && detail::is_container_compatible_v<Span, T>,
-                         int> = 0>
-    // NOLINTNEXTLINE(hicpp-explicit-conversions)
-    constexpr basic_byte_span(Span span) noexcept : storage_type(byte_cast<std::byte>(span.data()), span.size()) {}
+    constexpr basic_byte_span(std::nullptr_t) noexcept
+        requires(Extent == 0 || Extent == dynamic_extent)
+    {};
 
     // Iterators
     // begin (https://en.cppreference.com/w/cpp/container/span/begin)
-    [[nodiscard]] constexpr auto begin() const noexcept -> iterator { return data(); }
+    [[nodiscard]] constexpr auto begin() const noexcept -> T * { return data(); }
+    [[nodiscard]] constexpr auto cbegin() const noexcept -> const T * { return data(); }
 
     // end (https://en.cppreference.com/w/cpp/container/span/end)
-    [[nodiscard]] constexpr auto end() const noexcept -> iterator { return data() + size(); }
+    [[nodiscard]] constexpr auto end() const noexcept -> T * { return data() + size(); }
+    [[nodiscard]] constexpr auto cend() const noexcept -> const T * { return data() + size(); }
 
     // rbegin (https://en.cppreference.com/w/cpp/container/span/rbegin)
     [[nodiscard]] constexpr auto rbegin() const noexcept -> reverse_iterator { return reverse_iterator(end()); }
+    [[nodiscard]] constexpr auto crbegin() const noexcept -> const_reverse_iterator {
+        return const_reverse_iterator(cend());
+    }
 
     // rend (https://en.cppreference.com/w/cpp/container/span/rend)
     [[nodiscard]] constexpr auto rend() const noexcept -> reverse_iterator { return reverse_iterator(begin()); }
+    [[nodiscard]] constexpr auto crend() const noexcept -> const_reverse_iterator {
+        return const_reverse_iterator(cbegin());
+    }
 
     // Element access
     // front (https://en.cppreference.com/w/cpp/container/span/front)
-    [[nodiscard]] constexpr auto front() const noexcept -> reference { return *data(); }
+    [[nodiscard]] constexpr auto front() const noexcept -> T & { return *data(); }
 
     // back (https://en.cppreference.com/w/cpp/container/span/back)
-    [[nodiscard]] constexpr auto back() const noexcept -> reference { return *(data() + (size() - 1)); }
+    [[nodiscard]] constexpr auto back() const noexcept -> T & { return *(data() + (size() - 1)); }
 
     // operator[] (https://en.cppreference.com/w/cpp/container/span/operator_at)
-    constexpr auto operator[](size_type idx) const noexcept -> reference { return data()[idx]; }
+    constexpr auto operator[](std::size_t idx) const noexcept -> T & { return data()[idx]; }
 
     // data (https://en.cppreference.com/w/cpp/container/span/data)
     using storage_type::data;
@@ -302,7 +232,7 @@ class basic_byte_span : public detail::basic_byte_span_storage<T, Extent> {
     using storage_type::size;
 
     // size_bytes (https://en.cppreference.com/w/cpp/container/span/size_bytes)
-    [[nodiscard]] constexpr auto size_bytes() const noexcept -> size_type { return size() * sizeof(element_type); }
+    [[nodiscard]] constexpr auto size_bytes() const noexcept -> std::size_t { return size() * sizeof(T); }
 
     // empty (https://en.cppreference.com/w/cpp/container/span/empty)
     [[nodiscard]] constexpr auto empty() const noexcept -> bool { return size() == 0; }
@@ -310,28 +240,30 @@ class basic_byte_span : public detail::basic_byte_span_storage<T, Extent> {
     // Subviews
     // first (https://en.cppreference.com/w/cpp/container/span/first)
     template <std::size_t Count>
-    [[nodiscard]] constexpr auto first() const noexcept -> basic_byte_span<element_type, Count> {
+        requires(Count <= Extent || Extent == dynamic_extent)
+    [[nodiscard]] constexpr auto first() const noexcept -> basic_byte_span<T, Count> {
         return {data(), Count};
     }
-    [[nodiscard]] constexpr auto
-    first(std::size_t Count) const noexcept -> basic_byte_span<element_type, dynamic_extent> {
+    [[nodiscard]] constexpr auto first(std::size_t Count) const noexcept -> basic_byte_span<T, dynamic_extent> {
         return {data(), Count};
     }
 
     // last (https://en.cppreference.com/w/cpp/container/span/last)
     template <std::size_t Count>
-    [[nodiscard]] constexpr auto last() const noexcept -> basic_byte_span<element_type, Count> {
+        requires(Count <= Extent || Extent == dynamic_extent)
+    [[nodiscard]] constexpr auto last() const noexcept -> basic_byte_span<T, Count> {
         return {data() + (size() - Count), Count};
     }
-    [[nodiscard]] constexpr auto
-    last(std::size_t Count) const noexcept -> basic_byte_span<element_type, dynamic_extent> {
+    [[nodiscard]] constexpr auto last(std::size_t Count) const noexcept -> basic_byte_span<T, dynamic_extent> {
         return {data() + (size() - Count), Count};
     }
 
     // subspan (https://en.cppreference.com/w/cpp/container/span/subspan)
     template <std::size_t Offset, std::size_t Count = dynamic_extent>
-    [[nodiscard]] constexpr auto
-    subspan() const noexcept -> basic_byte_span<element_type, detail::subspan_extent(Offset, Count, extent)> {
+        requires(Offset <= Extent || Extent == dynamic_extent) &&
+                (Count == dynamic_extent || Offset + Count <= Extent || Extent == dynamic_extent)
+    [[nodiscard]] constexpr auto subspan() const noexcept
+        -> basic_byte_span<T, detail::subspan_extent(Offset, Count, extent)> {
         return {data() + Offset, Count != dynamic_extent ? Count : size() - Offset};
     }
     [[nodiscard]] constexpr auto subspan(std::size_t Offset, std::size_t Count = dynamic_extent) const noexcept
@@ -342,81 +274,49 @@ class basic_byte_span : public detail::basic_byte_span_storage<T, Extent> {
     ///////////////////////////////////////////////////////////////////////////
     // extra functionality
 
-    template <typename U, std::enable_if_t<detail::is_compatible_v<U, T>, int> = 0>
+    template <typename U>
+        requires byte_aliasable<T, detail::const_like_t<T, U>>
     [[nodiscard]] constexpr auto begin() const noexcept {
         return byte_cast<U>(begin());
     }
 
-    template <typename U, std::enable_if_t<detail::is_compatible_v<U, T>, int> = 0>
+    template <typename U>
+        requires byte_aliasable<T, detail::const_like_t<T, U>>
     [[nodiscard]] constexpr auto end() const noexcept {
         return byte_cast<U>(end());
     }
 
-    template <typename U, std::enable_if_t<detail::is_compatible_v<U, T>, int> = 0>
+    template <typename U>
+        requires byte_aliasable<T, detail::const_like_t<T, U>>
     [[nodiscard]] constexpr auto rbegin() const noexcept {
         return std::reverse_iterator(end<U>());
     }
 
-    template <typename U, std::enable_if_t<detail::is_compatible_v<U, T>, int> = 0>
+    template <typename U>
+        requires byte_aliasable<T, detail::const_like_t<T, U>>
     [[nodiscard]] constexpr auto rend() const noexcept {
         return std::reverse_iterator(begin<U>());
     }
 
-    template <typename U, std::enable_if_t<detail::is_compatible_v<U, T>, int> = 0>
-    constexpr auto data() const noexcept {
+    template <typename U>
+        requires byte_aliasable<T, detail::const_like_t<T, U>>
+    [[nodiscard]] constexpr auto data() const noexcept {
         return byte_cast<U>(data());
     }
 
-    constexpr auto u8data() const noexcept { return byte_cast<uint8_t>(data()); }
-    constexpr auto cdata() const noexcept { return byte_cast<char>(data()); }
-    constexpr auto ucdata() const noexcept { return byte_cast<unsigned char>(data()); }
+    [[nodiscard]] constexpr auto u8data() const noexcept { return data<std::uint8_t>(); }
+    [[nodiscard]] constexpr auto cdata() const noexcept { return data<char>(); }
+    [[nodiscard]] constexpr auto ucdata() const noexcept { return data<unsigned char>(); }
 
-    friend auto operator==(basic_byte_span left, basic_byte_span right) -> bool {
-        return left.size() == right.size() && std::memcmp(left.data(), right.data(), left.size()) == 0;
+    template <typename T2, std::size_t E2>
+    [[nodiscard]] constexpr friend auto operator==(basic_byte_span lhs, basic_byte_span<T2, E2> rhs) noexcept -> bool {
+        return std::equal(lhs.begin(), lhs.end(), rhs.begin(), rhs.end());
     }
 
-    template <std::size_t E2>
-    friend auto operator==(basic_byte_span left, basic_byte_span<const std::byte, E2> right) -> bool {
-        return left.size() == right.size() && std::memcmp(left.data(), right.data(), left.size()) == 0;
-    }
-
-    friend auto operator!=(basic_byte_span left, basic_byte_span right) -> bool { return !(left == right); }
-
-    template <std::size_t E2>
-    friend auto operator!=(basic_byte_span left, basic_byte_span<const std::byte, E2> right) -> bool {
-        return !(left == right);
-    }
-
-    friend auto operator<(basic_byte_span left, basic_byte_span right) -> bool {
-        return std::lexicographical_compare(left.template begin<uint8_t>(), left.template end<uint8_t>(),
-                                            right.template begin<uint8_t>(), right.template end<uint8_t>());
-    }
-
-    template <std::size_t E2>
-    friend auto operator<(basic_byte_span left, basic_byte_span<const std::byte, E2> right) -> bool {
-        return std::lexicographical_compare(left.template begin<uint8_t>(), left.template end<uint8_t>(),
-                                            right.template begin<uint8_t>(), right.template end<uint8_t>());
-    }
-
-    friend auto operator>(basic_byte_span left, basic_byte_span right) -> bool { return right < left; }
-
-    template <std::size_t E2 = dynamic_extent>
-    friend auto operator>(basic_byte_span left, basic_byte_span<const std::byte, E2> right) -> bool {
-        return right < left;
-    }
-
-    friend auto operator<=(basic_byte_span left, basic_byte_span right) -> bool { return !(left > right); }
-
-    template <std::size_t E2 = dynamic_extent>
-    friend auto operator<=(basic_byte_span left, basic_byte_span<const std::byte, E2> right) -> bool {
-        return !(left > right);
-    }
-
-    friend auto operator>=(basic_byte_span left, basic_byte_span right) -> bool { return !(left < right); }
-
-    template <std::size_t E2 = dynamic_extent>
-    friend auto operator>=(basic_byte_span left, basic_byte_span<const std::byte, E2> right) -> bool {
-        return !(left < right);
+    template <typename T2, std::size_t E2>
+    [[nodiscard]] constexpr friend auto operator<=>(basic_byte_span lhs, basic_byte_span<T2, E2> rhs) noexcept
+        -> std::strong_ordering {
+        return std::lexicographical_compare_three_way(lhs.begin(), lhs.end(), rhs.begin(), rhs.end());
     }
 };
 
