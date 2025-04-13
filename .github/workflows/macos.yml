@@ -14,14 +14,15 @@ jobs:
       fail-fast: false
       matrix:
         os:
-          - macos-12
+          - macos-13
         xcode:
-          # https://github.com/actions/virtual-environments/blob/main/images/macos/macos-12-Readme.md#xcode
-          - "13.3.1"
-          - "13.4.1"
-          - "14.0.1"
+          # https://github.com/actions/virtual-environments/blob/main/images/macos/macos-13-Readme.md#xcode
           - "14.1"
           - "14.2"
+          - "14.3.1"
+          - "15.0.1"
+          - "15.1"
+          - "15.2"
 
     steps:
       - name: Checkout
